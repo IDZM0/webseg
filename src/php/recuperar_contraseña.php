@@ -13,6 +13,7 @@ $mensaje = "";
 $mostrar_preguntas = false;
 $mostrar_nueva_contrasena = false;
 $user_data = null;
+$error_nueva_password = [];
 
 if (!isset($conn)) {
     die("Error: No se pudo conectar a la base de datos.");
@@ -57,9 +58,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             $respuestas_db = $stmt->fetch(PDO::FETCH_ASSOC);
 
             if ($respuestas_db &&
-                strtolower(trim($respuesta1)) === strtolower(trim($respuestas_db['respuesta_recuperacion1'])) &&
-                strtolower(trim($respuesta2)) === strtolower(trim($respuestas_db['respuesta_recuperacion2'])) &&
-                strtolower(trim($respuesta3)) === strtolower(trim($respuestas_db['respuesta_recuperacion3']))
+                password_verify($respuesta1, $respuestas_db['respuesta_recuperacion1']) &&
+                password_verify($respuesta2, $respuestas_db['respuesta_recuperacion2']) &&
+                password_verify($respuesta3, $respuestas_db['respuesta_recuperacion3'])
             ) {
                 $mostrar_nueva_contrasena = true;
                 $mensaje = "Respuestas correctas. Ingrese su nueva contraseña.";
@@ -77,27 +78,24 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
         $confirmar_nueva_password = $_POST['confirmar_nueva_password'];
         $user_id = $_SESSION['recuperacion_user_id'];
 
-        // 1. Verificar si las contraseñas son iguales (corrección del primer problema)
-        if ($nueva_password !== $confirmar_nueva_password) {
-            $error = "Las nuevas contraseñas no coinciden.";
-            $mostrar_nueva_contrasena = true;
-        } elseif (strlen($nueva_password) < 8) {
-            $error = "La contraseña debe tener al menos 8 caracteres.";
-            $mostrar_nueva_contrasena = true;
-        } else {
-            // 2. Hashear la nueva contraseña
+        if (empty($nueva_password)) {
+            $error_nueva_password['nueva_password'] = "Por favor, ingrese la nueva contraseña.";
+        } elseif (strlen($nueva_password) < 8 || !preg_match('/[A-Z]/', $nueva_password) || !preg_match('/[a-z]/', $nueva_password) || !preg_match('/[0-9]/', $nueva_password) || !preg_match('/[^a-zA-Z0-9\s]/', $nueva_password)) {
+            $error_nueva_password['nueva_password'] = "La contraseña debe tener al menos 8 caracteres, una mayúscula, una minúscula, un número y un carácter especial.";
+        } elseif ($nueva_password !== $confirmar_nueva_password) {
+            $error_nueva_password['confirmar_nueva_password'] = "Las nuevas contraseñas no coinciden.";
+        }
+
+        if (empty($error_nueva_password)) {
             $hashed_password = password_hash($nueva_password, PASSWORD_BCRYPT);
             try {
-                // 3. Actualizar la contraseña en la base de datos (corrección del segundo problema)
                 $stmt = $conn->prepare("UPDATE usuarios SET password = :password WHERE id = :id");
                 $stmt->bindParam(':password', $hashed_password);
                 $stmt->bindParam(':id', $user_id);
-                
+
                 if ($stmt->execute()) {
                     $mensaje = "Contraseña actualizada con éxito. Será redirigido al login en unos segundos.";
                     unset($_SESSION['recuperacion_user_id']);
-                    
-                    // 4. Redirección al login (corrección del tercer problema)
                     header("Location: login.php");
                     exit();
                 } else {
@@ -109,6 +107,8 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
                 $error = "Error interno al actualizar la contraseña. Intente más tarde.";
                 $mostrar_nueva_contrasena = true;
             }
+        } else {
+            $mostrar_nueva_contrasena = true;
         }
     }
 }
@@ -121,6 +121,13 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Recuperar Contraseña</title>
     <link rel="stylesheet" href="../css/style.css">
+    <style>
+        .error-message {
+            color: #ff0019;
+            font-size: 0.9em;
+            margin-top: 5px;
+        }
+    </style>
 </head>
 <body>
     <div class="container login">
@@ -162,9 +169,15 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
             <form method="post" action="<?= htmlspecialchars($_SERVER["PHP_SELF"]) ?>">
                 <label>Nueva Contraseña:</label>
                 <input type="password" name="nueva_password" required minlength="8"><br>
+                <?php if (isset($error_nueva_password['nueva_password'])): ?>
+                    <p class="error-message"><?= htmlspecialchars($error_nueva_password['nueva_password'], ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
 
                 <label>Confirmar Nueva Contraseña:</label>
                 <input type="password" name="confirmar_nueva_password" required minlength="8"><br>
+                <?php if (isset($error_nueva_password['confirmar_nueva_password'])): ?>
+                    <p class="error-message"><?= htmlspecialchars($error_nueva_password['confirmar_nueva_password'], ENT_QUOTES, 'UTF-8') ?></p>
+                <?php endif; ?>
 
                 <div class="form-submit">
                     <input type="submit" value="Guardar Nueva Contraseña">
@@ -174,7 +187,9 @@ if ($_SERVER["REQUEST_METHOD"] == "POST") {
 
         <div style="margin-top: 20px; text-align: center;">
             <a href="login.php">Volver al Login</a>
+            
         </div>
     </div>
 </body>
+
 </html>

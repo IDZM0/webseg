@@ -8,6 +8,7 @@
 include 'config.php';
 
 $error = "";
+$errores = []; // Array para almacenar los errores individuales
 
 try {
     if (!isset($conn)) {
@@ -33,11 +34,27 @@ try {
         $pregunta2 = "Nombre de tu Mejor Amigo";
         $pregunta3 = "Nombre de tu Primera Mascota";
 
-        // Validación de contraseñas con caracteres especiales
-        if (empty($password) || empty($confirm_password)) {
+        // Validación de la contraseña
+        if (strlen($password) < 8) {
+            $errores['password_length'] = "La contraseña debe tener al menos 8 caracteres.";
+        }
+        if (!preg_match('/[a-z]/', $password)) {
+            $errores['password_lower'] = "La contraseña debe contener al menos una minúscula.";
+        }
+        if (!preg_match('/[A-Z]/', $password)) {
+            $errores['password_upper'] = "La contraseña debe contener al menos una mayúscula.";
+        }
+        if (!preg_match('/[0-9]/', $password)) {
+            $errores['password_number'] = "La contraseña debe contener al menos un número.";
+        }
+        if (!preg_match('/[^a-zA-Z0-9\s]/', $password)) {
+            $errores['password_special'] = "La contraseña debe contener al menos un carácter especial.";
+        }
+
+        if (!empty($errores)) {
+            $error = "Por favor, corrige los siguientes errores en la contraseña:";
+        } elseif (empty($confirm_password)) {
             $error = "Por favor ingresa una contraseña y confirma.";
-        } elseif (!preg_match("/[A-Za-z0-9@#$%^&+=!]/", $password)) {
-            $error = "La contraseña debe contener al menos un carácter especial (@, #, $, %, etc.).";
         } elseif ($password !== $confirm_password) {
             $error = "Las contraseñas no coinciden.";
         } elseif (empty($rol) || empty($tipo_documento)) {
@@ -126,30 +143,56 @@ try {
             margin-left: auto;
             margin-right: auto;
         }
+
+        .error-password {
+            color: red;
+            font-size: 0.8em;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container registro">
         <h2>Registro de Personas</h2>
 
-        <?php if (!empty($error)): ?>
+        <?php if (!empty($error) && empty($errores)): ?>
             <p class="error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></p>
+        <?php elseif (!empty($errores)): ?>
+            <p class="error">Por favor, corrige los siguientes errores:</p>
+            <?php if (isset($errores['password_length'])): ?>
+                <p class="error-password"><?php echo htmlspecialchars($errores['password_length'], ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php endif; ?>
+            <?php if (isset($errores['password_lower'])): ?>
+                <p class="error-password"><?php echo htmlspecialchars($errores['password_lower'], ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php endif; ?>
+            <?php if (isset($errores['password_upper'])): ?>
+                <p class="error-password"><?php echo htmlspecialchars($errores['password_upper'], ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php endif; ?>
+            <?php if (isset($errores['password_number'])): ?>
+                <p class="error-password"><?php echo htmlspecialchars($errores['password_number'], ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php endif; ?>
+            <?php if (isset($errores['password_special'])): ?>
+                <p class="error-password"><?php echo htmlspecialchars($errores['password_special'], ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php endif; ?>
+            <?php if (!empty($error) && !isset($errores['password_length']) && !isset($errores['password_lower']) && !isset($errores['password_upper']) && !isset($errores['password_number']) && !isset($errores['password_special'])): ?>
+                <p class="error"><?php echo htmlspecialchars($error, ENT_QUOTES, 'UTF-8'); ?></p>
+            <?php endif; ?>
         <?php endif; ?>
 
         <form method="post" action="<?php echo htmlspecialchars($_SERVER["PHP_SELF"]); ?>">
             <div class="form-row">
                 <div class="form-column">
                     <label>Nombres:</label>
-                    <input type="text" name="nombres" required><br>
+                    <input type="text" name="nombres" value="<?php echo isset($_POST['nombres']) ? htmlspecialchars($_POST['nombres'], ENT_QUOTES, 'UTF-8') : ''; ?>" required><br>
 
                     <label>Apellidos:</label>
-                    <input type="text" name="apellidos" required><br>
+                    <input type="text" name="apellidos" value="<?php echo isset($_POST['apellidos']) ? htmlspecialchars($_POST['apellidos'], ENT_QUOTES, 'UTF-8') : ''; ?>" required><br>
 
                     <label>Email:</label>
-                    <input type="email" name="email" required><br>
+                    <input type="email" name="email" value="<?php echo isset($_POST['email']) ? htmlspecialchars($_POST['email'], ENT_QUOTES, 'UTF-8') : ''; ?>" required><br>
 
                     <label>Username:</label>
-                    <input type="text" name="username" required><br>
+                    <input type="text" name="username" value="<?php echo isset($_POST['username']) ? htmlspecialchars($_POST['username'], ENT_QUOTES, 'UTF-8') : ''; ?>" required><br>
 
                     <label>Contraseña:</label>
                     <input type="password" name="password" required><br>
@@ -162,25 +205,25 @@ try {
                     <label>Tipo de Documento:</label>
                     <select name="tipo_documento" required>
                         <option value="">---</option>
-                        <option value="cedula">Cédula de Ciudadanía</option>
-                        <option value="tarjeta_identidad">Tarjeta de Identidad</option>
-                        <option value="cedula_extranjeria">Cédula Extranjera</option>
+                        <option value="cedula" <?php if (isset($_POST['tipo_documento']) && $_POST['tipo_documento'] == 'cedula') echo 'selected'; ?>>Cédula de Ciudadanía</option>
+                        <option value="tarjeta_identidad" <?php if (isset($_POST['tipo_documento']) && $_POST['tipo_documento'] == 'tarjeta_identidad') echo 'selected'; ?>>Tarjeta de Identidad</option>
+                        <option value="cedula_extranjeria" <?php if (isset($_POST['tipo_documento']) && $_POST['tipo_documento'] == 'cedula_extranjeria') echo 'selected'; ?>>Cédula Extranjera</option>
                     </select><br>
 
                     <label>Número de Documento:</label>
-                    <input type="text" name="num_documento" required><br>
+                    <input type="text" name="num_documento" value="<?php echo isset($_POST['num_documento']) ? htmlspecialchars($_POST['num_documento'], ENT_QUOTES, 'UTF-8') : ''; ?>" required><br>
 
                     <label>Teléfono:</label>
-                    <input type="text" name="telefono" required><br>
+                    <input type="text" name="telefono" value="<?php echo isset($_POST['telefono']) ? htmlspecialchars($_POST['telefono'], ENT_QUOTES, 'UTF-8') : ''; ?>" required><br>
 
                     <label>Dirección:</label>
-                    <input type="text" name="direccion" required><br>
+                    <input type="text" name="direccion" value="<?php echo isset($_POST['direccion']) ? htmlspecialchars($_POST['direccion'], ENT_QUOTES, 'UTF-8') : ''; ?>" required><br>
 
                     <label>Rol:</label>
                     <select name="rol" required>
                         <option value="">---</option>
-                        <option value="superusuario">Super Usuario</option>
-                        <option value="digitador">Digitador</option>
+                        <option value="superusuario" <?php if (isset($_POST['rol']) && $_POST['rol'] == 'superusuario') echo 'selected'; ?>>Super Usuario</option>
+                        <option value="digitador" <?php if (isset($_POST['rol']) && $_POST['rol'] == 'digitador') echo 'selected'; ?>>Digitador</option>
                     </select><br>
                 </div>
             </div>
@@ -188,13 +231,13 @@ try {
             <div class="preguntas-container">
                 <h3 style="color: #10019c;">Preguntas de Recuperación de Contraseña</h3>
                 <label>Nombre de un Familiar Querido:</label>
-                <input type="text" name="respuesta1" required class="pregunta-input"><br>
+                <input type="text" name="respuesta1" value="<?php echo isset($_POST['respuesta1']) ? htmlspecialchars($_POST['respuesta1'], ENT_QUOTES, 'UTF-8') : ''; ?>" required class="pregunta-input"><br>
 
                 <label>Nombre de tu Mejor Amigo:</label>
-                <input type="text" name="respuesta2" required class="pregunta-input"><br>
+                <input type="text" name="respuesta2" value="<?php echo isset($_POST['respuesta2']) ? htmlspecialchars($_POST['respuesta2'], ENT_QUOTES, 'UTF-8') : ''; ?>" required class="pregunta-input"><br>
 
                 <label>Nombre de tu Primera Mascota:</label>
-                <input type="text" name="respuesta3" required class="pregunta-input"><br>
+                <input type="text" name="respuesta3" value="<?php echo isset($_POST['respuesta3']) ? htmlspecialchars($_POST['respuesta3'], ENT_QUOTES, 'UTF-8') : ''; ?>" required class="pregunta-input"><br>
             </div>
 
             <div class="form-submit">

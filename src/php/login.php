@@ -5,7 +5,7 @@
  * Manejo de autenticación y cierre de sesión de forma segura.
  */
 
-session_start();
+session_start(); // Asegúrate de iniciar la sesión al principio
 
 include 'config.php';
 
@@ -17,35 +17,44 @@ if (!isset($conn)) {
     die("Error: No se pudo conectar a la base de datos.");
 }
 
+// Manejo de cierre de sesión
 if (isset($_GET['logout'])) {
     session_destroy();
     header("Location: login.php");
     exit();
 }
 
+// Verificación del formulario de login
 if ($_SERVER["REQUEST_METHOD"] == "POST") {
     $login_identifier = filter_input(INPUT_POST, 'username', FILTER_SANITIZE_SPECIAL_CHARS); // Usamos 'username' como identificador genérico
     $password = $_POST['password'];
 
+    // Inicialización de intentos fallidos
     if (!isset($_SESSION['intentos'])) {
         $_SESSION['intentos'] = 0;
         $_SESSION['ultimo_intento'] = time();
     }
 
+    // Bloqueo temporal si se superan los intentos fallidos
     if ($_SESSION['intentos'] >= $intentos_maximos && (time() - $_SESSION['ultimo_intento']) < $bloqueo_tiempo) {
         $error = "Demasiados intentos fallidos. Intente nuevamente en 1 minuto.";
     } else {
         try {
-            // Intenta buscar por username o email
+            // Buscar al usuario por username o email
             $stmt = $conn->prepare("SELECT id, password, rol FROM usuarios WHERE username = :identifier OR email = :identifier");
             $stmt->bindValue(':identifier', $login_identifier);
             $stmt->execute();
             $user = $stmt->fetch(PDO::FETCH_ASSOC);
 
+            // Verificación de las credenciales
             if ($user && password_verify($password, $user['password'])) {
-                $_SESSION['rol'] = $user['rol'];
-                $_SESSION['user_id'] = $user['id'];
-                $_SESSION['intentos'] = 0;
+                // Almacenar en sesión el ID y rol del usuario
+                $_SESSION['id_usuario'] = $user['id']; // Guardamos el id del usuario en la sesión
+                $_SESSION['rol'] = $user['rol']; // Guardamos el rol del usuario
+
+                $_SESSION['intentos'] = 0; // Restablecer los intentos fallidos
+
+                // Redirigir al usuario al dashboard o página principal
                 header("Location: ../index.php");
                 exit();
             } else {
